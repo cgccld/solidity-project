@@ -26,6 +26,8 @@ interface IMarketplace {
         address taker;
         Item item;
         Payment payments;
+        uint256 nonce;
+        uint256 deadline;
     }
 
     struct Order {
@@ -34,7 +36,10 @@ interface IMarketplace {
         PaymentOption option;
     }
 
-    function buyLazyMint(Order calldata order_) external payable;
+    function buyLazyMint(
+        Order calldata order_,
+        bytes calldata signature_
+    ) external payable;
 
     event Redeemed(
         address indexed buyer,
@@ -48,4 +53,7 @@ interface IMarketplace {
         bool indexed isRefund,
         uint256 amount
     );
+
+    event FeeSet(uint256 currentFee, uint256 updateFee);
+    event BanSet(address account, bool isBanned);
 }

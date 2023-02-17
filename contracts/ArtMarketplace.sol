@@ -13,7 +13,6 @@ import { IPriceOracle } from "./interfaces/IPriceOracle.sol";
 import { IMarketplace } from "./interfaces/IMarketplace.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
-import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ERC165Checker } from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
@@ -56,7 +55,6 @@ contract ArtMarketplace is
         0x1c301dfb0ebce365552ccf106202212b2e83e6722705d40ea38ecb8d66bcb0f0;
 
     IPriceOracle public immutable priceOracle;
-    AggregatorV3Interface public immutable priceFeed;
 
     uint256 public feePercent;
 
@@ -68,10 +66,8 @@ contract ArtMarketplace is
     constructor(
         address owner_,
         uint256 feePercent_,
-        IPriceOracle priceOracle_,
-        AggregatorV3Interface priceFeed_
+        IPriceOracle priceOracle_
     ) Ownable() Pausable() ReentrancyGuard() EIP712("ArtMarketplace", "1") {
-        priceFeed = priceFeed_;
         priceOracle = priceOracle_;
 
         _setFee(feePercent_);
@@ -299,7 +295,7 @@ contract ArtMarketplace is
                     item_.deadline,
                     item_.tokenInfo,
                     item_.message,
-                    item_.signature
+                    keccak256(bytes(item_.signature))
                 )
             );
     }
@@ -341,7 +337,7 @@ contract ArtMarketplace is
                     paymentOption_.token,
                     paymentOption_.amount,
                     paymentOption_.deadline,
-                    paymentOption_.signature
+                    keccak256(bytes(paymentOption_.signature))
                 )
             );
     }

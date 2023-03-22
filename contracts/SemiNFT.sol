@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { Pausable } from "@openzeppelin/contracts/security/Pausable.sol";
-import { ERC1155 } from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-
 import { ISemiNFT } from "./interfaces/ISemiNFT.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import { ERC1155Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 
-contract SemiNFT is ERC1155, Ownable, Pausable {
+contract SemiNFT is
+    Initializable,
+    UUPSUpgradeable,
+    ERC1155Upgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable
+{
     string private _name;
     string private _symbol;
     string private baseURI;
@@ -15,14 +22,37 @@ contract SemiNFT is ERC1155, Ownable, Pausable {
 
     mapping(uint256 => string) public tokenURIs;
 
-    constructor(
-        string memory name_,
-        string memory symbol_,
-        string memory baseURI_
-    ) Ownable() Pausable() ERC1155("") {
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        string calldata name_,
+        string calldata symbol_,
+        string calldata baseURI_,
+        address marketplace_
+    ) public initializer {
+        __ERC1155_init(_name);
+        __Ownable_init();
+        __Pausable_init();
+        __UUPSUpgradeable_init();
+
         _name = name_;
         _symbol = symbol_;
         baseURI = baseURI_;
+        marketplace = marketplace_;
+    }
+
+    function setURI(string memory newURI_) public onlyOwner {
+        _setURI(newURI_);
+    }
+
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
     }
 
     modifier onlyMarketplace(address sender) {
@@ -44,22 +74,25 @@ contract SemiNFT is ERC1155, Ownable, Pausable {
         return ISemiNFT.lazyMintTransfer.selector;
     }
 
-    function setURI(string memory newURI_) public onlyOwner {
-        _setURI(newURI_);
-    }
-
-    function pause() public onlyOwner {
-        _pause();
-    }
-
-    function unpause() public onlyOwner {
-        _unpause();
-    }
-
     function _setTokenURI(
         uint256 tokenId_,
         string memory tokenURI_
     ) internal virtual {
         tokenURIs[tokenId_] = tokenURI_;
     }
+
+    function _beforeTokenTransfer(
+        address operator,
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) internal override whenNotPaused {
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
+    }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }

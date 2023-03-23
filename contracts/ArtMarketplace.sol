@@ -1,35 +1,39 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { Pausable } from "@openzeppelin/contracts/security/Pausable.sol";
-import { ERC721, IERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import { ERC1155, IERC1155 } from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import { ERC721Upgradeable, IERC721Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import { ERC1155Upgradeable, IERC1155Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 
 import { INFT } from "./interfaces/INFT.sol";
 import { ISemiNFT } from "./interfaces/ISemiNFT.sol";
 import { IPriceOracle } from "./interfaces/IPriceOracle.sol";
 import { IMarketplace } from "./interfaces/IMarketplace.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
+import { IERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import { IERC20PermitUpgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-IERC20PermitUpgradeable.sol";
 
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ERC165Checker } from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
-import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import { Counters } from "@openzeppelin/contracts/utils/Counters.sol";
-import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { CountersUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
+import { ECDSAUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
+import { EIP712Upgradeable } from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import { SafeERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import { ERC165CheckerUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165CheckerUpgradeable.sol";
 
 contract ArtMarketplace is
     IMarketplace,
-    Ownable,
-    Pausable,
-    ReentrancyGuard,
-    EIP712
+    Initializable,
+    UUPSUpgradeable,
+    EIP712Upgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuardUpgradeable
 {
-    using SafeERC20 for IERC20;
-    using ERC165Checker for address;
-    using Counters for Counters.Counter;
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using ERC165CheckerUpgradeable for address;
+    using CountersUpgradeable for CountersUpgradeable.Counter;
 
     bytes32 public constant WRONG_CALL =
         0xb66bb11815392dc0f2faeca1c34bd40e0212a81b5fde1e3837180e783b177006;
@@ -54,22 +58,31 @@ contract ArtMarketplace is
     bytes32 private constant PAYMENT_OPTION_TYPE_HASH =
         0x1c301dfb0ebce365552ccf106202212b2e83e6722705d40ea38ecb8d66bcb0f0;
 
-    IPriceOracle public immutable priceOracle;
+    IPriceOracle public priceOracle;
 
     uint256 public feePercent;
 
     mapping(address => bool) public isBanned;
     mapping(address => bool) public supportedTokens;
     mapping(address => bool) public supportedPayments;
-    mapping(address => Counters.Counter) public nonces;
+    mapping(address => CountersUpgradeable.Counter) public nonces;
 
-    constructor(
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address owner_,
         uint256 feePercent_,
         IPriceOracle priceOracle_
-    ) Ownable() Pausable() ReentrancyGuard() EIP712("ArtMarketplace", "1") {
-        priceOracle = priceOracle_;
+    ) public initializer {
+        __Pausable_init();
+        __Ownable_init();
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
+        __EIP712_init("ArtMarketplace", "1");
 
+        priceOracle = priceOracle_;
         _setFee(feePercent_);
         _transferOwnership(owner_);
     }
@@ -95,7 +108,7 @@ contract ArtMarketplace is
         bytes calldata signature_
     ) external payable whenNotPaused nonReentrant {
         bytes32 digest = _hashTypedDataV4(_hash(order_));
-        address signer = ECDSA.recover(digest, signature_);
+        address signer = ECDSAUpgradeable.recover(digest, signature_);
         require(signer == order_.sale.taker, "INVALID_SIGNATURE");
 
         _checkBanned(_msgSender());
@@ -168,7 +181,7 @@ contract ArtMarketplace is
         uint256 payout = amount_ + fee;
         if (order_.option.token != address(0)) {
             if (
-                IERC20(order_.option.token).allowance(
+                IERC20Upgradeable(order_.option.token).allowance(
                     order_.maker,
                     address(this)
                 ) < payout
@@ -177,7 +190,7 @@ contract ArtMarketplace is
                     order_.option.signature,
                     (uint8, bytes32, bytes32)
                 );
-                IERC20Permit(order_.option.token).permit(
+                IERC20PermitUpgradeable(order_.option.token).permit(
                     order_.maker,
                     address(this),
                     payout,
@@ -188,14 +201,14 @@ contract ArtMarketplace is
                 );
             }
 
-            IERC20(order_.option.token).safeTransferFrom(
+            IERC20Upgradeable(order_.option.token).safeTransferFrom(
                 order_.maker,
                 order_.sale.taker,
                 amount_
             );
 
             /// chuyen cjo san
-            IERC20(order_.option.token).safeTransferFrom(
+            IERC20Upgradeable(order_.option.token).safeTransferFrom(
                 order_.maker,
                 address(this),
                 fee
@@ -341,4 +354,8 @@ contract ArtMarketplace is
                 )
             );
     }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IArtAuction } from "./interfaces/IArtAuction.sol";
@@ -28,8 +28,6 @@ contract ArtAuction is IArtAuction {
         vault = payable(msg.sender);
     }
 
-    
-
     function callAuction() external onlyNotStart {
         token.safeTransferFrom(msg.sender, owner, tokenId);
         started = true;
@@ -38,7 +36,13 @@ contract ArtAuction is IArtAuction {
         emit Started(startTime);
     }
 
-    function bid() external payable onlyBeforeEnd onlyStart onlyEOA(msg.sender) {
+    function bid()
+        external
+        payable
+        onlyBeforeEnd
+        onlyStart
+        onlyEOA(msg.sender)
+    {
         require(msg.value > highestBid, "NOT_ENOUGH_BID_AMOUNT");
         bids[highestBidder] += highestBid;
         highestBidder = msg.sender;

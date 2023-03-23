@@ -1,86 +1,90 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import {INFT} from "./interfaces/INFT.sol";
-import {IArtAuction} from "./interface/IArtAuction.sol";
+import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import { IArtAuction } from "./interfaces/IArtAuction.sol";
 
-
-contract ArtAuction {
-    INFT public token;
+contract ArtAuction is IArtAuction {
+    IERC721 public token;
     bool public started;
     uint256 public tokenId;
     uint256 public endTime;
     uint256 public startTime;
     uint256 public highestBid;
     address public highestBidder;
-    address payables public vault;
+    address payable public vault;
     address public owner;
     mapping(address => uint256) bids;
-    
-    constructor(address token_, uint256 tokenId_, uint256 startingBid_) {
-        token = token_;
+
+    constructor(
+        address token_,
+        uint256 tokenId_,
+        uint256 startingBid_
+    ) payable {
+        token = IERC721(token_);
         tokenId = tokenId_;
         owner = address(this);
         highestBid = startingBid_;
         vault = payable(msg.sender);
     }
 
-    modifier onlyAfter() {
-        require(block.timestamp > endTime, Auction__Not__Ended());
-        _;
-    }
-
-    modifier onlyBefore() {
-        require(block.timestamp > endTime, Auction__Already__Ended());
-        _;
-    }
-
-    modifier onlyStart() {
-        require(started, Auction__Not__Started());
-        _;
-    }
-
-    modifier onlyNotStart() {
-        require(!started, Auction__Already__Started());
-        _;
-    }
     
-    modifier onlyEOA(address sender_) {
-        require(
-            !(sender == address(0) ||
-            sender.code.length == 0),
-            "Invalid EOA"
-        )
-    }
-
 
     function callAuction() external onlyNotStart {
-        token.safeTransferFrom(_msgSender(), owner, tokenId);
+        token.safeTransferFrom(msg.sender, owner, tokenId);
         started = true;
         startTime = block.timestamp;
         endTime = startTime + 7 days;
         emit Started(startTime);
     }
 
-    function bit() external payable onlyBefore onlyStart onlyEOA(msg.sender){
-        require(msg.value > highestBid, Not__Enough__Bid__Amount());
+    function bid() external payable onlyBeforeEnd onlyStart onlyEOA(msg.sender) {
+        require(msg.value > highestBid, "NOT_ENOUGH_BID_AMOUNT");
         bids[highestBidder] += highestBid;
-        highestBidder = _msgSender();
+        highestBidder = msg.sender;
         highestBid = msg.value;
 
         emit Bidded(highestBidder, highestBid);
     }
 
-    function claim() external onlyAfter {
-        uint balance = bids[_msgSender()];
-        bids[_msgSender()] = 0;
-        payable(_msgSender()).transfer(balance);
+    function claim() external onlyAfterEnd {
+        uint balance = bids[msg.sender];
+        bids[msg.sender] = 0;
+        payable(msg.sender).transfer(balance);
 
-        emit Claimed(_msgSender(), bits[_msgSender()]);
+        emit Claimed(msg.sender, bids[msg.sender]);
     }
 
-    function end() external onlyStart onlyAfter {
-        nft.safeTransferFrom(owner, highestBidder, tokenId);
+    function end() external onlyStart onlyAfterEnd {
+        token.safeTransferFrom(owner, highestBidder, tokenId);
         emit Ended(highestBidder, highestBid);
+    }
+
+    modifier onlyAfterEnd() {
+        require(block.timestamp < endTime, "AUCTION_NOT_ENDED");
+        _;
+    }
+
+    modifier onlyBeforeEnd() {
+        require(block.timestamp > endTime, "AUCTION_ALREADY_ENDED");
+        _;
+    }
+
+    modifier onlyStart() {
+        require(started, "AUCTION_NOT_STARTED");
+        _;
+    }
+
+    modifier onlyNotStart() {
+        require(!started, "AUCTION_ALREADY_STARTED");
+        _;
+    }
+
+    modifier onlyEOA(address sender_) {
+        require(
+            !(sender_ == address(0) || sender_.code.length == 0),
+            "INVALID_EOA"
+        );
+        _;
     }
 }

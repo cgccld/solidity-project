@@ -10,15 +10,15 @@ interface IArtAuction {
     event Ended(address winner, uint256 bidAmount);
 
     // -------------------------------- ERROR -----------------------------------
-    error Auction__Already__Started();
-    error Auction__Already__Ended();
-    error Auction__Not__Started();
-    error Auction__Not__Ended();
-    error Not__Enough__Bid__Amount();
+    // error Auction__Already__Started();
+    // error Auction__Already__Ended();
+    // error Auction__Not__Started();
+    // error Auction__Not__Ended();
+    // error Not__Enough__Bid__Amount();
 
     function callAuction() external;
 
-    function bid() external;
+    function bid() external payable;
 
     function claim() external;
 

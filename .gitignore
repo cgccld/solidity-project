@@ -4,7 +4,8 @@ coverage
 coverage.json
 typechain
 typechain-types
-lib/forge-std
+
+
 # Hardhat files
 cache
 artifacts
